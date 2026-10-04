@@ -7,9 +7,12 @@
 # and a failure warns instead of failing the session start.
 (
     set -e
-    export WORKFLOW_MIRROR_URL="${WORKFLOW_MIRROR_URL:-https://codeload.github.com/elarmuzik1993/claude-workflow/tar.gz/refs/heads/main}"
+    # A committed file, served through raw.githubusercontent.com: the one GitHub route a cloud
+    # session allows for a repo not attached to it. Older pastes download from codeload, which
+    # works at setup time; their plugin still refreshes through this route.
+    url="${WORKFLOW_MIRROR_URL:-https://raw.githubusercontent.com/elarmuzik1993/claude-workflow/main/workflow.tar.gz}"
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    curl -fsSL --retry 2 --max-time 60 "$WORKFLOW_MIRROR_URL" | tar -xz -C "$tmp" --strip-components=1
+    curl -fsSL --retry 2 --max-time 60 "$url" | tar -xz -C "$tmp" --strip-components=1
     bash "$tmp/install.sh"
 ) || echo "workflow plugin: install failed; sessions start without it" >&2

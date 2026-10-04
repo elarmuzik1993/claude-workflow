@@ -10,6 +10,7 @@ repo whole, so changes made here are lost. Issues and PRs here aren't watched.
 | `commands/` | personal slash commands (`/plain`, `/bughunt`, `/finalise`, …) |
 | `install.sh` | installs both into `~/.claude` (plugin as `~/.claude/skills/workflow`) |
 | `setup-block.sh` | the block for a Claude Code cloud environment's Setup script |
+| `workflow.tar.gz` | all of the above in one file: cloud sessions download it through raw.githubusercontent.com |
 
 To use it in Claude Code cloud sessions, paste `setup-block.sh` into the environment's Setup
 script once. The plugin then refreshes itself from this repo at every session start.

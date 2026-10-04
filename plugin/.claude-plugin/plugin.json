@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "The same session workflow in every repo, local and cloud: a status line and quick checks at start, <type>/<work> branch names enforced, /workflow:kit to set a repo up, and /workflow:handoff so the next session on any device can resume.",
   "author": {
     "name": "Boris Miscenco"

@@ -47,13 +47,17 @@ if [ "$where" = cloud ] && [ -r "$mirror" ]; then
     version() { grep -o '"version": *"[^"]*"' "$here/../.claude-plugin/plugin.json" 2>/dev/null | grep -o '[0-9][^"]*'; }
     was=$(version)
     url=$(head -n1 "$mirror")
-    if ( tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT &&
-         curl -fsSL --max-time "${WORKFLOW_REFRESH_TIMEOUT:-10}" "$url" | tar -xz -C "$tmp" --strip-components=1 &&
-         WORKFLOW_MIRROR_URL=$url bash "$tmp/install.sh" ) >/dev/null 2>&1; then
+    # Downloaded, unpacked and installed as separate steps, so a failure names its own cause
+    # (a 403 from the proxy once looked like a broken archive).
+    if err=$( { tmp=$(mktemp -d) && trap 'rm -rf "$tmp"' EXIT &&
+                curl -fsSL --max-time "${WORKFLOW_REFRESH_TIMEOUT:-10}" -o "$tmp/bundle.tgz" "$url" &&
+                tar -xzf "$tmp/bundle.tgz" -C "$tmp" --strip-components=1 &&
+                bash "$tmp/install.sh"; } 2>&1 >/dev/null ); then
         now=$(version)
         [ "$now" = "$was" ] || printf 'workflow plugin %s -> %s, refreshed from the mirror\n' "${was:-?}" "${now:-?}"
     else
-        printf 'workflow plugin: refresh from the mirror failed; running the cached %s\n' "${was:-version}"
+        printf 'workflow plugin: refresh from the mirror failed (%s); running the cached %s\n' \
+            "$(printf '%s\n' "$err" | grep . | tail -n1 | cut -c1-120)" "${was:-version}"
     fi
 fi
 
