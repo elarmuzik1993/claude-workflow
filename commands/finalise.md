@@ -1,5 +1,5 @@
 ---
-description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; pushes a code repo only for a STATE.md-only hand-off, to main.
+description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; a code repo goes out as the hand-off sends it: STATE.md-only to main, work as a PR.
 ---
 
 # Finalise the session
@@ -9,9 +9,9 @@ Run this when the user says **"finalise the session"**, "finalize the session", 
 Goal: leave the written record matching reality, so the next session (on any machine, in any
 tool) can pick up from the docs alone.
 
-**Never open a PR, and push a code repo only for the hand-off's own case:** a hand-off that
-changes only `.agents/STATE.md`, pushed to `main` from any branch (`/workflow:handoff` step 6).
-Otherwise commit only.
+**Push code repos and open PRs only as the hand-off does** (`/workflow:handoff` step 6): a
+hand-off that changes only `.agents/STATE.md` goes to `main` from any branch; other work is
+pushed on its branch with its PR opened or updated.
 
 > ℹ️ **The vault is now yours to commit — nothing else will.** The global post-commit hook
 > (`core.hooksPath` → `~/.git_hooks/log-commit.ps1`, `post-commit` on Linux) appends one line to
@@ -136,8 +136,8 @@ Order matters — **source first, then deploy**:
    reads better in the log.
 5. **Push the vault** (`git push origin main`). The hook used to do this; it does not now, so
    an unpushed vault is the one regression this design can produce. Push it.
-6. **Stop. Do not push any code repo**, except a STATE.md-only hand-off, which goes to `main`
-   out as `/workflow:handoff` step 6 says. Anything else: commit only, unless the user asks.
+6. **Push each code repo as `/workflow:handoff` step 6 says:** STATE.md-only to `main`, work on
+   its branch with its PR opened or updated. Nothing else goes out.
 7. Final report, explicitly two lists:
    - **Updated:** every file touched.
    - **Skipped:** what you did not update *and why* ("Roadmap unchanged — no scope movement").

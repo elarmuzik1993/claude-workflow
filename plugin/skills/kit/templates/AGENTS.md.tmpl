@@ -40,9 +40,10 @@ Obsidian: [[<Project>]]
 - <naming, patterns, and libraries to prefer or avoid>
 
 ## Rules
-- **Git.** Show the diff before committing. Push or open PRs only when asked, except a hand-off
-  that changes only `.agents/STATE.md`, which goes straight to `main` from any branch, cloud
-  too. Other cloud work goes on the session's own branch, pushed before ending; nothing else.
+- **Git.** Show the diff before committing. Push or open PRs only when asked; running the
+  hand-off asks. A hand-off that changes only `.agents/STATE.md` goes straight to `main` from
+  any branch, cloud too; other work goes on its branch, pushed, with its PR opened or updated.
+  In a cloud session, push before ending; nothing else.
 - **Branches.** Always `<type>/<work>`: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`,
   `build`, `ci` or `chore`, then short kebab-case (`feat/portable-workflow`). Never a
   tool-generated name (`claude/<slug>-<id>`, random suffixes); rename an assigned branch

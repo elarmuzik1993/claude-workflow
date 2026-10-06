@@ -8,8 +8,8 @@ description: End the session so the next one, on any device, local or cloud, can
 Works the same locally and in cloud sessions: nothing here depends on this machine. (Locally,
 `/finalise` runs these steps and then syncs the Obsidian vault.)
 
-The hand-off never needs a PR of its own. It rides in the work's PR, or, when there is no other
-work, goes straight to `main`.
+The hand-off never needs a PR of its own. It rides in the work's PR, which it opens if there is
+none yet, or, when there is no other work, goes straight to `main`.
 
 1. **Verify.** Run `bash scripts/verify.sh`. If it fails, fix it or record the failure under
    *Known issues*. Never hand off a claim you didn't check.
@@ -54,10 +54,20 @@ work, goes straight to `main`.
      connector instead (its create-or-update-file tool, with this commit's message), so the
      hand-off survives the container. If that fails too, or locally, stop and say so; in the
      cloud, also put the new STATE.md in full in the report.
-   - *Work, in the cloud* (`CLAUDE_CODE_REMOTE=true`): push the session's branch: the container
-     is discarded and unpushed work is lost. The branch must be named `<type>/<work>`; if it
-     still has a generated name, rename it first with `git branch -m <type>/<work>`.
-   - *Work, locally:* push only when asked.
+   - *Work,* locally or in the cloud: push the branch and open or update its PR. The branch must
+     be named `<type>/<work>`; rename a generated name first (`git branch -m <type>/<work>`),
+     then `git push -u origin HEAD`. In the cloud (`CLAUDE_CODE_REMOTE=true`) this can't wait:
+     the container is discarded and unpushed work is lost. Then the PR, with `gh` locally or
+     the GitHub connector in the cloud:
+     - *The branch has an open PR:* update its description to cover the whole branch now. Never
+       open a second one.
+     - *It has none:* open one against `main`. Title in the repo's commit style; the body says
+       what changed and why, grouped by area, and quotes step 1's verify result. Follow the
+       repo's PR template if it has one. Ready for review if verify passed; a **draft** if it
+       failed, saying which check failed.
+     - Never merge it, approve it or add AI attribution to it. With no GitHub access, the push
+       still stands: say the PR wasn't opened and why.
 
    The hand-off itself pushes nothing else.
-7. **Report** two lists: *Updated* (every file touched) and *Skipped* (with the reason).
+7. **Report** two lists: *Updated* (every file touched) and *Skipped* (with the reason), then
+   where it went: `main`, or the branch and its PR's link.
