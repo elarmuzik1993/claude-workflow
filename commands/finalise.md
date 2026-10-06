@@ -1,5 +1,5 @@
 ---
-description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; pushes a code repo only for a STATE.md-only hand-off on main.
+description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; pushes a code repo only for a STATE.md-only hand-off, to main.
 ---
 
 # Finalise the session
@@ -9,8 +9,9 @@ Run this when the user says **"finalise the session"**, "finalize the session", 
 Goal: leave the written record matching reality, so the next session (on any machine, in any
 tool) can pick up from the docs alone.
 
-**Never open a PR, and push a code repo only for the hand-off's own case:** a commit on `main`
-that changes only `.agents/STATE.md` (`/workflow:handoff` step 6). Otherwise commit only.
+**Never open a PR, and push a code repo only for the hand-off's own case:** a hand-off that
+changes only `.agents/STATE.md`, pushed to `main` from any branch (`/workflow:handoff` step 6).
+Otherwise commit only.
 
 > ℹ️ **The vault is now yours to commit — nothing else will.** The global post-commit hook
 > (`core.hooksPath` → `~/.git_hooks/log-commit.ps1`, `post-commit` on Linux) appends one line to
@@ -135,7 +136,7 @@ Order matters — **source first, then deploy**:
    reads better in the log.
 5. **Push the vault** (`git push origin main`). The hook used to do this; it does not now, so
    an unpushed vault is the one regression this design can produce. Push it.
-6. **Stop. Do not push any code repo**, except a STATE.md-only hand-off on `main`, which goes
+6. **Stop. Do not push any code repo**, except a STATE.md-only hand-off, which goes to `main`
    out as `/workflow:handoff` step 6 says. Anything else: commit only, unless the user asks.
 7. Final report, explicitly two lists:
    - **Updated:** every file touched.

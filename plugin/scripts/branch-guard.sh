@@ -20,7 +20,8 @@
 #                                keep their names. In a repo with .agents/STATE.md, a push to
 #                                main/master may change only that file: work goes through a PR,
 #                                and a hand-off with nothing else to say goes straight to the
-#                                trunk. Deployed alone, so it must stay self-contained.
+#                                trunk; any other branch that changes only that file is refused.
+#                                Deployed alone, so it must stay self-contained.
 #
 # A rule in CLAUDE.md is only advice, and cloud sessions are told by their harness to push the
 # branch they were assigned (claude/<slug>-<id>), so the convention is enforced here instead.
@@ -46,36 +47,77 @@ EOF
     exit "$2"
 }
 
-# In a repo-kit repo the trunk takes work only through a PR. A hand-off that changes nothing but
-# .agents/STATE.md (a redeploy recorded, a step done) is pushed to it directly, so it needs no PR
-# of its own. Fails open: a remote commit this clone lacks, or a diff git can't make, is let through.
-# $1 remote sha, $2 local sha, $3 the trunk's name
-state_only() {
-    [ -f .agents/STATE.md ] || return 0
-    local files
-    files=$(git diff --name-only "$1" "$2" 2>/dev/null) || return 0
-    files=$(printf '%s\n' "$files" | grep -vx '\.agents/STATE\.md')
-    [ -z "$files" ] && return 0
-    cat >&2 <<EOF
-Blocked: a direct push to '$3' may change only .agents/STATE.md in this repo; this one also changes:
-$(printf '%s\n' "$files" | sed 's/^/  /')
+# In a repo-kit repo (one with .agents/STATE.md) the trunk takes work only through a PR, and a
+# hand-off that changes nothing but STATE.md (a review, a redeploy recorded) goes to it directly,
+# so it never needs a PR of its own. Both halves are checked here:
+#   trunk   a push to the trunk may change only STATE.md;
+#   branch  a branch whose only change since it left the trunk is STATE.md is refused, also when
+#           its earlier work has already merged: it would need a PR of its own. A cloud session
+#           always starts on a branch of its own, so a review-only hand-off lands here if it
+#           goes by the branch.
+# Fails open: a commit this clone lacks, an unfetched trunk, or a diff git can't make.
+# $1 trunk|branch, $2 the range to diff, $3 the branch pushed to, $4 remote, $5 trunk, $6 exit code
+STATE=.agents/STATE.md
+state_check() {
+    [ -f "$STATE" ] || return 0
+    local files others
+    files=$(git diff --name-only "$2" 2>/dev/null) || return 0
+    others=$(printf '%s\n' "$files" | grep -vxF "$STATE")
+    if [ "$1" = trunk ]; then
+        [ -z "$others" ] && return 0
+        cat >&2 <<EOF
+Blocked: a direct push to '$3' may change only $STATE in this repo; this one also changes:
+$(printf '%s\n' "$others" | sed 's/^/  /')
 Put the work on a <type>/<work> branch, with its STATE.md update, and open a PR.
 Don't bypass this check (--no-verify).
 EOF
-    exit 1
+    else
+        [ -n "$files" ] && [ -z "$others" ] || return 0
+        cat >&2 <<EOF
+Blocked: branch '$3' changes only $STATE since it left $4/$5 (earlier work on it, if any, has
+merged), so it would need a PR of its own. A hand-off with nothing else in it goes to '$5':
+  git rebase $4/$5 && git push $4 HEAD:$5
+Don't bypass this check (--no-verify).
+EOF
+    fi
+    exit "$6"
+}
+
+# The trunk a remote has, as this clone last fetched it; nothing when it has none.
+# $1 remote
+fetched_trunk() {
+    local t
+    for t in main master; do
+        git rev-parse -q --verify "refs/remotes/$1/$t^{commit}" >/dev/null 2>&1 && { echo "$t"; return 0; }
+    done
+    return 1
+}
+
+# A branch push: $1 the commit pushed, $2 the branch, $3 remote, $4 exit code
+branch_check() {
+    [[ $2 =~ $LONG_LIVED ]] && return 0
+    local trunk
+    trunk=$(fetched_trunk "$3") || return 0
+    state_check branch "$3/$trunk...$1" "$2" "$3" "$trunk" "$4"
 }
 
 # ── git pre-push: stdin has "<local ref> <local sha> <remote ref> <remote sha>" per ref ──
 if [ "$(basename "$0")" = pre-push ]; then
+    remote=${1:-origin}                     # git passes the remote's name (or its URL: fails open)
     while read -r _ local_sha remote_ref remote_sha; do
         case "$local_sha" in *[!0]*) ;; *) continue ;; esac     # all zeros: a deletion
         case "$remote_ref" in refs/heads/*) ;; *) continue ;; esac   # tags and other refs
         branch=${remote_ref#refs/heads/}
         case "$remote_sha" in *[!0]*)                           # the remote already has it
-            [[ $branch =~ $TRUNK ]] && state_only "$remote_sha" "$local_sha" "$branch"
+            if [[ $branch =~ $TRUNK ]]; then
+                state_check trunk "$remote_sha..$local_sha" "$branch" "$remote" "$branch" 1
+            else
+                branch_check "$local_sha" "$branch" "$remote" 1
+            fi
             continue ;;
         esac
         conforms "$branch" || block "$branch" 1
+        branch_check "$local_sha" "$branch" "$remote" 1
     done
     exit 0
 fi
@@ -114,8 +156,11 @@ PY=""
 for p in python3 python; do "$p" -c '' >/dev/null 2>&1 && { PY=$p; break; }; done
 [ -n "$PY" ] || exit 0                             # can't parse the call: never block blind
 
-# Print each branch name the command would create, rename to, or push; HEAD means the current
-# branch. Deletions, tags, listings and switching to an existing branch print nothing.
+# Print each branch name the command would create or rename to; HEAD means the current branch.
+# A push prints "push<TAB>remote<TAB>source<TAB>destination" instead, so the pushed commit is
+# checked too. Its source is "-" when that can't be done before the command runs: an earlier
+# part of the command makes commits that don't exist yet, or it pushes from another repo (-C).
+# Deletions, tags, listings and switching to an existing branch print nothing.
 targets=$(printf '%s' "$input" | "$PY" -c '
 import json, re, shlex, sys
 REDIRECT = re.compile(r"^[0-9]*(?:>>?|<)")               # 2>, >, >>, <, >/dev/null, 2>err.log
@@ -212,6 +257,7 @@ for token in tokens:
         words.append(token)
 simple.append(words)
 
+out, committing = [], False
 for words in simple:
     while words and "=" in words[0] and not words[0].startswith("-"):
         words = words[1:]                                  # leading VAR=value assignments
@@ -223,29 +269,33 @@ for words in simple:
     if i >= len(words):
         continue
     sub, args = words[i], words[i + 1:]
+    elsewhere = any(w == "-C" or w.startswith(("--git-dir", "--work-tree")) for w in words[1:i])
 
     if sub == "push":
         if any(a in ("-d", "--delete", "--tags", "--all", "--mirror") for a in args):
             continue
-        refspecs = positional(args, ("-o", "--push-option", "--repo", "--receive-pack", "--exec"))[1:]
+        given = positional(args, ("-o", "--push-option", "--repo", "--receive-pack", "--exec"))
+        remote, refspecs = (given[0] if given else "origin"), given[1:]
+        unchecked = committing or elsewhere
         if not refspecs:
-            print("HEAD")
+            out.append(["push", remote, "-" if unchecked else "HEAD", "HEAD"])
         for spec in refspecs:
             spec = spec.lstrip("+")
             if spec.startswith(":") or spec.startswith("refs/tags/"):
                 continue                                   # deletion, or a tag
-            dst = spec.split(":", 1)[1] if ":" in spec else spec
+            src, dst = spec.split(":", 1) if ":" in spec else (spec, spec)
             if not dst.startswith("refs/tags/"):
-                print(dst[len("refs/heads/"):] if dst.startswith("refs/heads/") else dst)
+                dst = dst[len("refs/heads/"):] if dst.startswith("refs/heads/") else dst
+                out.append(["push", remote, "-" if unchecked else src, dst])
     elif sub == "checkout":
         for name in value_after(args, ("-b", "-B")):
-            print(name)
+            out.append([name])
     elif sub == "switch":
         for name in value_after(args, ("-c", "-C", "--create", "--force-create")):
-            print(name)
+            out.append([name])
     elif sub == "worktree" and args[:1] == ["add"]:
         for name in value_after(args[1:], ("-b", "-B")):
-            print(name)
+            out.append([name])
     elif sub == "branch":
         listing = {"-d", "-D", "--delete", "-l", "--list", "-a", "--all", "-r", "--remotes",
                    "--show-current", "-v", "-vv", "--verbose", "--unset-upstream",
@@ -256,15 +306,23 @@ for words in simple:
         names = positional(args, ("-u", "--set-upstream-to", "--sort", "--format"))
         renaming = any(a in ("-m", "-M", "--move", "-c", "-C", "--copy") for a in args)
         if names:
-            print(names[-1] if renaming else names[0])     # new name: last when renaming, else first
+            out.append([names[-1] if renaming else names[0]])     # new name: last when renaming, else first
+    if sub in ("commit", "merge", "rebase", "pull", "cherry-pick", "revert", "am", "reset"):
+        committing = True
+
+for line in out:
+    print("\t".join(line))
 ')
 
 while IFS= read -r target; do
     target=${target%$'\r'}                  # Python on Windows prints CRLF; $(...) strips only the last CR
     [ -n "$target" ] || continue
+    src=
+    case "$target" in push$'\t'*) IFS=$'\t' read -r _ remote src target <<< "$target" ;; esac
     [ "$target" = HEAD ] && target=$current
     [ -n "$target" ] || continue                                        # detached HEAD
     git show-ref --verify --quiet "refs/tags/$target" 2>/dev/null && continue
     conforms "$target" || block "$target" 2
+    [ -n "$src" ] && [ "$src" != - ] && branch_check "$src" "$target" "$remote" 2
 done <<< "$targets"
 exit 0
