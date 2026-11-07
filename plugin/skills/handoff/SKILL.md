@@ -9,7 +9,9 @@ Works the same locally and in cloud sessions: nothing here depends on this machi
 `/finalise` runs these steps and then syncs the Obsidian vault.)
 
 The hand-off never needs a PR of its own. It rides in the work's PR, which it opens if there is
-none yet, or, when there is no other work, goes straight to `main`.
+none yet, or, when there is no other work, goes straight to `main`. When it ends, **nothing is
+left only on this machine**: every change is committed and pushed, each on its own branch and PR
+(step 7 checks). Merging is `/finalise`'s job, on request.
 
 1. **Verify.** Run `bash scripts/verify.sh`. If it fails, fix it or record the failure under
    *Known issues*. Never hand off a claim you didn't check.
@@ -43,8 +45,11 @@ none yet, or, when there is no other work, goes straight to `main`.
    `main`, keep `main`'s STATE.md, and redo only this branch's changes to it.
 4. **Update docs that changed,** in the same commit: `AGENTS.md` if rules, commands or layout
    changed; README if usage changed. Skip the rest and say you skipped them.
-5. **Commit.** Show `git diff --stat`, then commit with a message saying what changed and why.
-   Follow the repo's commit rules in `AGENTS.md` (message style, commit identity).
+5. **Commit.** Stage everything this session changed, new files included (`git status --short`
+   lists them; `git add -A` is right once you have read that list). Leave out secrets, `.env`
+   files and machine-local files, and say so. Show `git diff --stat`, then commit with a message
+   saying what changed and why. Follow the repo's commit rules in `AGENTS.md` (message style,
+   commit identity). Unrelated changes may be separate commits; none stays uncommitted.
 6. **Push,** to where step 2 picked. Running the hand-off is the request to push it.
    - *STATE.md only:* put the commit on top of `main` and push it there, from whatever branch
      you are on: `git rebase origin/main` (on `main`: `git pull --rebase origin main`), then
@@ -68,6 +73,19 @@ none yet, or, when there is no other work, goes straight to `main`.
      - Never merge it, approve it or add AI attribution to it. With no GitHub access, the push
        still stands: say the PR wasn't opened and why.
 
-   The hand-off itself pushes nothing else.
-7. **Report** two lists: *Updated* (every file touched) and *Skipped* (with the reason), then
-   where it went: `main`, or the branch and its PR's link.
+   The hand-off pushes nothing but what step 7 finds unpushed.
+7. **Leave nothing behind.** Check the whole repo, not only this branch:
+   - `git status --short` is empty, and `git stash list` is empty or each stash is named in the
+     report.
+   - `git for-each-ref --format='%(refname:short) %(upstream:track)' refs/heads` shows no branch
+     `[ahead N]` and none without an upstream; `git worktree list` shows no other worktree with
+     uncommitted changes. (Branches that are only `gone` after a merge are fine.)
+   - Any other branch with unpushed commits and a `<type>/<work>` name: push it and open or
+     update its PR as step 6 does. Any with a generated or odd name, or a dirty worktree that
+     is not this session's: don't rename, commit or push someone else's work on a guess. Name
+     it in the report as *left behind*, with the command that would send it.
+   - Compare what landed: `git rev-parse HEAD` equals the remote branch's tip
+     (`git ls-remote origin <branch>`), or `main`'s for a STATE.md-only hand-off. A push that
+     was refused or never made is reported as such, never as done.
+8. **Report** two lists: *Updated* (every file touched) and *Skipped* (with the reason), then
+   where each piece went: `main`, or each branch with its PR's link, and anything *left behind*.

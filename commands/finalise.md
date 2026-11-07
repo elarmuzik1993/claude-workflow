@@ -1,5 +1,5 @@
 ---
-description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; a code repo goes out as the hand-off sends it: STATE.md-only to main, work as a PR.
+description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; a code repo goes out as the hand-off sends it (STATE.md-only to main, work as a PR), and the open PRs are merged when you ask.
 ---
 
 # Finalise the session
@@ -9,9 +9,10 @@ Run this when the user says **"finalise the session"**, "finalize the session", 
 Goal: leave the written record matching reality, so the next session (on any machine, in any
 tool) can pick up from the docs alone.
 
-**Push code repos and open PRs only as the hand-off does** (`/workflow:handoff` step 6): a
+**Push code repos and open PRs only as the hand-off does** (`/workflow:handoff` steps 6–7): a
 hand-off that changes only `.agents/STATE.md` goes to `main` from any branch; other work is
-pushed on its branch with its PR opened or updated.
+pushed on its branch with its PR opened or updated, and nothing is left unpushed. **Merging is
+the last step (Step 8) and happens only when you ask for it.**
 
 > ℹ️ **The vault is now yours to commit — nothing else will.** The global post-commit hook
 > (`core.hooksPath` → `~/.git_hooks/log-commit.ps1`, `post-commit` on Linux) appends one line to
@@ -137,9 +138,35 @@ Order matters — **source first, then deploy**:
 5. **Push the vault** (`git push origin main`). The hook used to do this; it does not now, so
    an unpushed vault is the one regression this design can produce. Push it.
 6. **Push each code repo as `/workflow:handoff` step 6 says:** STATE.md-only to `main`, work on
-   its branch with its PR opened or updated. Nothing else goes out.
-7. Final report, explicitly two lists:
+   its branch with its PR opened or updated. Then run its step 7, so no commit, stash or branch
+   stays only on this machine. Nothing else goes out.
+7. Report, explicitly two lists:
    - **Updated:** every file touched.
    - **Skipped:** what you did not update *and why* ("Roadmap unchanged — no scope movement").
 
 A finalise that quietly does nothing is worse than one that says "nothing needed updating."
+
+## Step 8 — Merge the open PRs (only on request)
+
+Last, after everything is pushed and reported. Merging is outward-facing and hard to undo, so
+it never happens on its own, and a `/finalise` that says nothing about merging does not merge.
+
+1. **List what could merge:** the PR of every branch Step 6 pushed or updated (the connector's
+   `list_pull_requests` in the cloud, `gh pr list --state open --author @me` locally). For each,
+   show number, title, draft or ready, CI state and whether it merges cleanly.
+2. **Ask once** which to merge, unless the request already named them (`/finalise merge`
+   means every PR that passes the gate below; `/finalise merge #12` only that one). No answer,
+   or "no", ends the step: the PRs stay open and the report says so.
+3. **Gate, per PR.** Merge only a PR that is ready (not draft), has green required checks, has
+   no conflicts and no unresolved "changes requested". A PR that fails the gate is not merged
+   and not forced: say which check blocks it. Never use admin override, never skip or disable
+   a check, never merge a PR you did not push this session.
+4. **Merge one at a time,** oldest first, with the repo's usual method (a merge commit unless
+   `git log` shows squash merges). The message carries no AI attribution. Every PR rewrites
+   `.agents/STATE.md`, so after each merge re-check the next: if it now conflicts, rebase on
+   `main` as `/workflow:handoff` step 3 says, push, and let CI go green before merging it.
+5. **Afterwards:** `git fetch origin` and fast-forward local `main` (`git switch main &&
+   git pull --ff-only`); the vault is not touched again. Delete a merged branch only if the
+   user asked. Do not write merge or PR status into `.agents/STATE.md`; git has it.
+6. **Report** each PR as *merged* (with the merge commit), *left open* (with the blocking
+   reason) or *not requested*.
