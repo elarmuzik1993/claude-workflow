@@ -1,5 +1,5 @@
 ---
-description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; a code repo goes out as the hand-off sends it (STATE.md-only to main, work as a PR), and the open PRs are merged when you ask.
+description: Close out the session — verify, sync vault + repo docs, then diff and commit. Commits and pushes the vault; a code repo goes out as the hand-off sends it (STATE.md-only to main, work as a PR), the session's mistakes are noted in the vault (never in a repo), the open PRs are merged when you ask, and merged branches are deleted.
 ---
 
 # Finalise the session
@@ -11,8 +11,8 @@ tool) can pick up from the docs alone.
 
 **Push code repos and open PRs only as the hand-off does** (`/workflow:handoff` steps 6–7): a
 hand-off that changes only `.agents/STATE.md` goes to `main` from any branch; other work is
-pushed on its branch with its PR opened or updated, and nothing is left unpushed. **Merging is
-the last step (Step 8) and happens only when you ask for it.**
+pushed on its branch with its PR opened or updated, and nothing is left unpushed. **Merging
+(Step 8) happens only when you ask for it. Deleting merged branches (Step 9) is the last step.**
 
 > ℹ️ **The vault is now yours to commit — nothing else will.** The global post-commit hook
 > (`core.hooksPath` → `~/.git_hooks/log-commit.ps1`, `post-commit` on Linux) appends one line to
@@ -90,6 +90,23 @@ and why. Its *What's next* is one line pointing at the repo's `.agents/STATE.md`
 a copy of the list. STATE.md is the one live "next" for the repo, and cloud sessions update it
 without ever reaching the vault, so a copy here would go stale.
 
+### Mistakes and lessons
+
+Every session note gets a **Mistakes and lessons** section, from evidence only: the transcript's
+failed commands, things undone or redone, corrections from the user, rules that were broken and
+caught, and checks that failed. One line each: *what went wrong → why → what to do instead*.
+No blame, no guesses; if the session had none, write "none" rather than inventing some.
+
+**Mistakes stay in the vault and in the project they happened in.** File each one in the note of
+the project it belongs to (a session that touched two repos writes two notes, each with its own
+mistakes). Never write a mistake into a repo file — `AGENTS.md`, `STATE.md` or a README — and
+never into another project's note: a lesson from one repo is noise in the next. This step runs
+no `/learn`, so a finalise changes no rule on its own.
+
+If one mistake is likely to recur and costly to repeat, end the note with a single line
+*Candidate rule: …*, and tell the user in the report. Whether it becomes a rule is theirs to
+decide: they run `/learn` in that repo themselves.
+
 ## Step 5 — Sync the docs
 
 Update only what actually changed — skip the rest and say you skipped it.
@@ -166,7 +183,24 @@ it never happens on its own, and a `/finalise` that says nothing about merging d
    `.agents/STATE.md`, so after each merge re-check the next: if it now conflicts, rebase on
    `main` as `/workflow:handoff` step 3 says, push, and let CI go green before merging it.
 5. **Afterwards:** `git fetch origin` and fast-forward local `main` (`git switch main &&
-   git pull --ff-only`); the vault is not touched again. Delete a merged branch only if the
-   user asked. Do not write merge or PR status into `.agents/STATE.md`; git has it.
+   git pull --ff-only`); the vault is not touched again. Do not write merge or PR status into
+   `.agents/STATE.md`; git has it. Branch cleanup is Step 9.
 6. **Report** each PR as *merged* (with the merge commit), *left open* (with the blocking
    reason) or *not requested*.
+
+## Step 9 — Delete merged branches (always, last)
+
+Runs on every finalise, whether or not Step 8 merged anything: branches merged by hand or in
+earlier sessions pile up otherwise. You asking for `/finalise` is the request to delete them.
+
+1. `git fetch --prune origin`, and `git switch main` first: the branch you stand on is never deleted.
+2. **Find them:** local branches that `git branch --merged origin/main` lists, plus remote ones
+   from `git branch -r --merged origin/main`. A branch squash-merged or rebased does not show
+   there, so also take any branch whose PR is *merged* and whose tip is the commit the PR merged
+   (the connector's `list_pull_requests`, or `gh pr list --state merged`).
+3. **Never delete:** `main`, the repo's default branch, a branch with an open PR, a branch with
+   commits that are in no merged PR, or anything in doubt. Say which ones were skipped and why.
+4. **Delete:** local with `git branch -d` (git refuses an unmerged one; only for a squash-merged
+   branch whose PR you confirmed in step 2 use `-D`), remote with `git push origin --delete <branch>`.
+   If the remote refuses, say so and move on; the local deletion still stands.
+5. **Report** the branches deleted (local, remote) and the ones kept with the reason.

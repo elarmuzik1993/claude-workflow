@@ -31,7 +31,8 @@ left only on this machine**: every change is committed and pushed, each on its o
 3. **Rewrite `.agents/STATE.md`.** Replace it; don't append. History belongs in git. Create it
    if the repo has none yet.
    - *Now*: what the repo does and where it is deployed or rolled out, **as it will be once this
-     branch merges** (on `main`: as it is).
+     branch merges** (on `main`: as it is). State only. How a command or script works belongs in
+     its own file or `AGENTS.md`, never here.
    - *Next*: ordered, concrete steps. A fresh session must be able to start the first one cold.
      Steps that can only happen after the merge (redeploy, paste a block) go here.
    - *Decisions*: only those still shaping the work, each with its reason.
@@ -39,12 +40,14 @@ left only on this machine**: every change is committed and pushed, each on its o
 
    Never write a branch or PR's status ("merged", "pushed", "PR #N open") or a list of merged
    PRs: git has those, and merging makes them wrong. Take facts from this session's command
-   output and `git log`, not memory. Mark anything else `unverified`. Keep it under ~40 lines.
+   output and `git log`, not memory. Mark anything else `unverified`. Keep it within 60 lines; trim now,
+   not at the next hand-off.
 
    Every PR rewrites STATE.md, so one merged first makes the next conflict. Then rebase on
    `main`, keep `main`'s STATE.md, and redo only this branch's changes to it.
 4. **Update docs that changed,** in the same commit: `AGENTS.md` if rules, commands or layout
-   changed; README if usage changed. Skip the rest and say you skipped them.
+   changed; README if usage changed. Add a line to `AGENTS.md` only for a fact that is not
+   already there; when one is, sharpen that line. Skip the rest and say you skipped them.
 5. **Commit.** Stage everything this session changed, new files included (`git status --short`
    lists them; `git add -A` is right once you have read that list). Leave out secrets, `.env`
    files and machine-local files, and say so. Show `git diff --stat`, then commit with a message
