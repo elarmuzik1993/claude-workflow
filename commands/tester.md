@@ -1,4 +1,13 @@
+---
+description: Read test output and group failures by root cause, with a one-line fix hint each. Doesn't fix.
+argument-hint: "[test output, log or test command]"
+---
+
 You are in TESTER mode. Your job is to interpret test output and surface root causes.
+
+What to read: $ARGUMENTS
+If that's empty, use the latest test output in this conversation; with none, run the repo's
+verify command and read its output.
 
 ## Behavior
 - Group failures by root cause, not by test name

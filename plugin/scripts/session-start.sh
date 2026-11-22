@@ -33,7 +33,7 @@ root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
 cd "$root" 2>/dev/null || exit 0
 
 STATE=.agents/STATE.md
-STATE_MAX_LINES="${STATE_MAX_LINES:-60}"
+STATE_MAX_LINES="${STATE_MAX_LINES:-45}"
 [ -f "$STATE" ] && workflow=1 || workflow=0     # the repo opted in: it has a hand-off note
 
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then where=cloud; else where=local; fi
@@ -59,6 +59,13 @@ if [ "$where" = cloud ] && [ -r "$mirror" ]; then
         printf 'workflow plugin: refresh from the mirror failed (%s); running the cached %s\n' \
             "$(printf '%s\n' "$err" | grep . | tail -n1 | cut -c1-120)" "${was:-version}"
     fi
+fi
+
+# A cloud container has no global git hooks (locally deploy.sh installs them in ~/.git_hooks),
+# so point git at the plugin's: the commit guard (secrets, AI attribution) and the pre-push
+# branch guard. Only when nothing else set core.hooksPath. Silent.
+if [ "$where" = cloud ] && [ -d "$here/../git-hooks" ] && ! git config --global core.hooksPath >/dev/null 2>&1; then
+    git config --global core.hooksPath "$(cd "$here/../git-hooks" && pwd)" 2>/dev/null
 fi
 
 # A cloud container starts from a fresh clone, so install the repo's dependencies there if it
@@ -114,8 +121,10 @@ fi
 
 # Quick verification. The repo's verify script is silent when clean, so this adds nothing
 # to the context unless something is broken.
+# On Windows a CMake repo's build needs MSVC's environment (msvc-env.sh).
 if [ -f scripts/verify.sh ]; then
-    if ! out=$(bash scripts/verify.sh --quick 2>&1); then
+    . "$here/msvc-env.sh"
+    if ! out=$(msvc_env && bash scripts/verify.sh --quick 2>&1); then
         printf '\nscripts/verify.sh --quick FAILED; fix this before other work:\n%s\n' "$out"
     fi
 fi

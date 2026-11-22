@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Cloud sessions: session-start.sh points git's core.hooksPath here. Locally, deploy.sh copies the script itself.
+WORKFLOW_HOOK=commit-msg exec bash "$(dirname "$0")/../scripts/commit-guard.sh" "$@"

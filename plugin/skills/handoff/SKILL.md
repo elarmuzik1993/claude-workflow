@@ -5,13 +5,13 @@ description: End the session so the next one, on any device, local or cloud, can
 
 # Hand off
 
-Works the same locally and in cloud sessions: nothing here depends on this machine. (Locally,
-`/finalise` runs these steps and then syncs the Obsidian vault.)
+Works the same locally and in cloud sessions: nothing here depends on this machine. It is the
+one end-of-session step; `/prmerge` merges when you ask.
 
 The hand-off never needs a PR of its own. It rides in the work's PR, which it opens if there is
 none yet, or, when there is no other work, goes straight to `main`. When it ends, **nothing is
 left only on this machine**: every change is committed and pushed, each on its own branch and PR
-(step 7 checks). Merging is `/finalise`'s job, on request.
+(step 7 checks). Merging is `/prmerge`'s job, on request.
 
 1. **Verify.** Run `bash scripts/verify.sh`. If it fails, fix it or record the failure under
    *Known issues*. Never hand off a claim you didn't check.
@@ -40,19 +40,24 @@ left only on this machine**: every change is committed and pushed, each on its o
 
    Never write a branch or PR's status ("merged", "pushed", "PR #N open") or a list of merged
    PRs: git has those, and merging makes them wrong. Take facts from this session's command
-   output and `git log`, not memory. Mark anything else `unverified`. Keep it within 60 lines; trim now,
+   output and `git log`, not memory. Mark anything else `unverified`. Keep it within 45 lines; trim now,
    not at the next hand-off.
 
    Every PR rewrites STATE.md, so one merged first makes the next conflict. Then rebase on
    `main`, keep `main`'s STATE.md, and redo only this branch's changes to it.
-4. **Update docs that changed,** in the same commit: `AGENTS.md` if rules, commands or layout
-   changed; README if usage changed. Add a line to `AGENTS.md` only for a fact that is not
-   already there; when one is, sharpen that line. Skip the rest and say you skipped them.
+4. **Update docs that changed,** in the same commit. Docs repeat each other, so search rather
+   than recall: for each behavior, name, path or step number this branch changed, `git grep -n`
+   its old wording and fix every match (other docs, skills, templates, comments). Also
+   `AGENTS.md` if rules, commands or layout changed; README if usage changed. Add a line to
+   `AGENTS.md` only for a fact that is not already there; when one is, sharpen that line. Say
+   what you searched for, and skip the rest saying so.
 5. **Commit.** Stage everything this session changed, new files included (`git status --short`
    lists them; `git add -A` is right once you have read that list). Leave out secrets, `.env`
    files and machine-local files, and say so. Show `git diff --stat`, then commit with a message
    saying what changed and why. Follow the repo's commit rules in `AGENTS.md` (message style,
    commit identity). Unrelated changes may be separate commits; none stays uncommitted.
+   If the commit added files that were untracked at step 1, run verify again now: some checks
+   read tracked files only. A new failure is fixed (or recorded) before pushing.
 6. **Push,** to where step 2 picked. Running the hand-off is the request to push it.
    - *STATE.md only:* put the commit on top of `main` and push it there, from whatever branch
      you are on: `git rebase origin/main` (on `main`: `git pull --rebase origin main`), then

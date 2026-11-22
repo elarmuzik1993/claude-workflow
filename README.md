@@ -7,7 +7,7 @@ repo whole, so changes made here are lost. Issues and PRs here aren't watched.
 | Path | What |
 |---|---|
 | `plugin/` | the `workflow` plugin: session-start checks, `<type>/<work>` branch guard, `/workflow:handoff`, `/workflow:kit` |
-| `commands/` | personal slash commands (`/plain`, `/bughunt`, `/finalise`, …) |
+| `commands/` | personal slash commands (`/plain`, `/status`, `/prmerge`, …) |
 | `install.sh` | installs both into `~/.claude` (plugin as `~/.claude/skills/workflow`) |
 | `setup-block.sh` | the block for a Claude Code cloud environment's Setup script |
 | `workflow.tar.gz` | all of the above in one file: cloud sessions download it through raw.githubusercontent.com |

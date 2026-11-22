@@ -21,6 +21,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__.*merge_pull_request",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/merge-gate.sh\"",
+            "timeout": 600
+          }
+        ]
       }
     ]
   }

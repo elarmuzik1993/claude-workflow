@@ -22,6 +22,12 @@
 #                                and a hand-off with nothing else to say goes straight to the
 #                                trunk; any other branch that changes only that file is refused.
 #                                Deployed alone, so it must stay self-contained.
+#                                The trunk is never rewritten: a push to main/master that isn't
+#                                a fast-forward is refused. In cloud sessions the plugin's
+#                                git-hooks/pre-push runs this file (WORKFLOW_HOOK=pre-push).
+#
+# Also as PreToolUse: refuses --no-verify on git commit/push/merge (and `git commit -n`), which
+# would skip these hooks and the commit guard, and a forced push to main/master.
 #
 # A rule in CLAUDE.md is only advice, and cloud sessions are told by their harness to push the
 # branch they were assigned (claude/<slug>-<id>), so the convention is enforced here instead.
@@ -102,7 +108,7 @@ branch_check() {
 }
 
 # ── git pre-push: stdin has "<local ref> <local sha> <remote ref> <remote sha>" per ref ──
-if [ "$(basename "$0")" = pre-push ]; then
+if [ "${WORKFLOW_HOOK:-$(basename "$0")}" = pre-push ]; then
     remote=${1:-origin}                     # git passes the remote's name (or its URL: fails open)
     while read -r _ local_sha remote_ref remote_sha; do
         case "$local_sha" in *[!0]*) ;; *) continue ;; esac     # all zeros: a deletion
@@ -110,6 +116,11 @@ if [ "$(basename "$0")" = pre-push ]; then
         branch=${remote_ref#refs/heads/}
         case "$remote_sha" in *[!0]*)                           # the remote already has it
             if [[ $branch =~ $TRUNK ]]; then
+                git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null
+                if [ $? = 1 ]; then                             # 128: an unknown commit, fail open
+                    echo "Blocked: this push rewrites $branch (not a fast-forward). The trunk is never rewritten; add a commit that undoes the change instead." >&2
+                    exit 1
+                fi
                 state_check trunk "$remote_sha..$local_sha" "$branch" "$remote" "$branch" 1
             else
                 branch_check "$local_sha" "$branch" "$remote" 1
@@ -150,7 +161,7 @@ fi
 
 # ── PreToolUse: stdin is the tool call as JSON ─────────────────────────────
 input=$(cat)
-case "$input" in *push*|*branch*|*checkout*|*switch*|*worktree*) ;; *) exit 0 ;; esac   # fast path
+case "$input" in *push*|*branch*|*checkout*|*switch*|*worktree*|*commit*|*verify*) ;; *) exit 0 ;; esac   # fast path
 
 PY=""
 for p in python3 python; do "$p" -c '' >/dev/null 2>&1 && { PY=$p; break; }; done
@@ -271,7 +282,11 @@ for words in simple:
     sub, args = words[i], words[i + 1:]
     elsewhere = any(w == "-C" or w.startswith(("--git-dir", "--work-tree")) for w in words[1:i])
 
+    if sub in ("commit", "push", "merge", "pull", "am", "rebase") and (
+            "--no-verify" in args or (sub == "commit" and "-n" in args)):
+        out.append(["noverify", sub])
     if sub == "push":
+        forced = any(a in ("-f", "--force") or a.startswith("--force-with-lease") for a in args)
         if any(a in ("-d", "--delete", "--tags", "--all", "--mirror") for a in args):
             continue
         given = positional(args, ("-o", "--push-option", "--repo", "--receive-pack", "--exec"))
@@ -279,7 +294,12 @@ for words in simple:
         unchecked = committing or elsewhere
         if not refspecs:
             out.append(["push", remote, "-" if unchecked else "HEAD", "HEAD"])
+            if forced:
+                out.append(["force", "HEAD"])
         for spec in refspecs:
+            if forced or spec.startswith("+"):
+                dst = spec.lstrip("+").split(":", 1)[-1]
+                out.append(["force", dst[len("refs/heads/"):] if dst.startswith("refs/heads/") else dst])
             spec = spec.lstrip("+")
             if spec.startswith(":") or spec.startswith("refs/tags/"):
                 continue                                   # deletion, or a tag
@@ -317,6 +337,19 @@ for line in out:
 while IFS= read -r target; do
     target=${target%$'\r'}                  # Python on Windows prints CRLF; $(...) strips only the last CR
     [ -n "$target" ] || continue
+    case "$target" in
+    noverify$'\t'*)
+        echo "Blocked: --no-verify skips the commit guard and the push checks. Fix what the hook reports instead." >&2
+        exit 2 ;;
+    force$'\t'*)
+        dst=${target#force$'\t'}
+        [ "$dst" = HEAD ] && dst=$current
+        if [[ $dst =~ $TRUNK ]]; then
+            echo "Blocked: a forced push to $dst rewrites the trunk. Add a commit that undoes the change instead." >&2
+            exit 2
+        fi
+        continue ;;
+    esac
     src=
     case "$target" in push$'\t'*) IFS=$'\t' read -r _ remote src target <<< "$target" ;; esac
     [ "$target" = HEAD ] && target=$current

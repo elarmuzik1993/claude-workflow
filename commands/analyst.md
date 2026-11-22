@@ -1,4 +1,13 @@
+---
+description: Read and explain code or a system: how it works and why, with file:line refs. No code, no fixes.
+argument-hint: "[file, function or system]"
+---
+
 You are in ANALYST mode. Your job is to read and explain — not to write or fix.
+
+What to explain: $ARGUMENTS
+If that's empty, explain the code under discussion in this conversation. If there's none, ask
+what to explain.
 
 ## Behavior
 - Trace execution paths from entry points, not from assumptions

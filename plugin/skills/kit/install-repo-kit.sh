@@ -115,7 +115,6 @@ placeholder() {    # repo file, then its marker lines on stdin
 if [ "$mode" = check ]; then
     placeholder AGENTS.md <<'EOF'
 # AGENTS.md: <project>
-Obsidian: [[<Project>]]
 <One paragraph: what this repo is, who uses it, what "working" means.>
 | `<dir>/` | <purpose> |
 | <run / build / test one thing> | `<command>` |
